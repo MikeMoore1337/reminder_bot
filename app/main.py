@@ -5,6 +5,7 @@ import logging
 
 from aiohttp import web
 
+from app.bot_commands import setup_bot_commands
 from app.bot_factory import create_bot, create_dispatcher
 from app.config import get_settings
 from app.logging_config import setup_logging
@@ -19,6 +20,9 @@ async def run_polling() -> None:
     logger.info("Starting bot application in polling mode")
     bot = create_bot()
     dp = create_dispatcher()
+
+    await setup_bot_commands(bot)
+
     try:
         await dp.start_polling(bot, allowed_updates=settings.allowed_updates)
     finally:
@@ -40,6 +44,9 @@ async def run_webhook() -> None:
 
     bot = create_bot()
     dp = create_dispatcher()
+
+    await setup_bot_commands(bot)
+
     await bot.set_webhook(
         url=settings.webhook_url,
         secret_token=settings.webhook_secret_token,
