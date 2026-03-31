@@ -11,7 +11,7 @@
 - использует **Alembic** для миграций.
 
 ## Стек
-- Python 3.11
+- Python 3.12
 - aiogram 3.x
 - PostgreSQL
 - SQLAlchemy 2.x async
