@@ -7,24 +7,23 @@ from app.config import get_settings
 
 settings = get_settings()
 
-
 PUBLIC_COMMANDS = [
-    BotCommand(command="start", description="Запуск бота"),
-    BotCommand(command="help", description="Помощь и примеры"),
+    BotCommand(command="start", description="Главное меню"),
+    BotCommand(command="help", description="Как пользоваться ботом"),
     BotCommand(command="timezone", description="Установить часовой пояс"),
-    BotCommand(command="mytimezone", description="Показать текущий часовой пояс"),
+    BotCommand(command="mytimezone", description="Показать мой часовой пояс"),
     BotCommand(command="remind", description="Создать напоминание"),
-    BotCommand(command="list", description="Список активных напоминаний"),
+    BotCommand(command="list", description="Мои активные напоминания"),
     BotCommand(command="cancel", description="Удалить напоминание по ID"),
 ]
 
 ADMIN_COMMANDS = [
-    BotCommand(command="start", description="Запуск бота"),
-    BotCommand(command="help", description="Помощь и примеры"),
+    BotCommand(command="start", description="Главное меню"),
+    BotCommand(command="help", description="Как пользоваться ботом"),
     BotCommand(command="timezone", description="Установить часовой пояс"),
-    BotCommand(command="mytimezone", description="Показать текущий часовой пояс"),
+    BotCommand(command="mytimezone", description="Показать мой часовой пояс"),
     BotCommand(command="remind", description="Создать напоминание"),
-    BotCommand(command="list", description="Список активных напоминаний"),
+    BotCommand(command="list", description="Мои активные напоминания"),
     BotCommand(command="cancel", description="Удалить напоминание по ID"),
     BotCommand(command="stats", description="Статистика бота"),
     BotCommand(command="failed", description="Ошибки отправки"),

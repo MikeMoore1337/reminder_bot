@@ -1,0 +1,258 @@
+from __future__ import annotations
+
+from aiogram import F, Router
+from aiogram.filters import Command, CommandObject
+from aiogram.types import Message
+
+from app.keyboards.reply import get_main_keyboard, get_timezone_keyboard
+from app.services.reminder_service import format_reminder_for_user, list_pending_reminders
+from app.services.timezone_service import (
+    get_or_create_user,
+    get_user_timezone,
+    set_user_timezone,
+)
+
+router = Router()
+
+START_TEXT = (
+    "👋 <b>Привет! Я бот-напоминалка.</b>\n\n"
+    "Помогаю не забывать важное:\n"
+    "- напоминания на дату и время\n"
+    "- напоминания через время\n"
+    "- повторяющиеся напоминания\n\n"
+    "📌 <b>Примеры:</b>\n"
+    "- напомни через 30 минут проверить духовку\n"
+    "- напомни завтра в 9 созвон\n"
+    "- напомни каждый день в 10 выпить витамины\n\n"
+    "Выбери действие кнопкой ниже или просто напиши напоминание текстом."
+)
+
+HELP_TEXT = (
+    "❓ <b>Как пользоваться ботом</b>\n\n"
+    "🕒 <b>Разовые напоминания</b>\n"
+    "- напомни 31.03.2026 18:30 купить молоко\n"
+    "- напомни завтра в 9 созвон\n"
+    "- напомни сегодня в 20 вынести мусор\n\n"
+    "⏱ <b>Через время</b>\n"
+    "- напомни через 15 минут выключить духовку\n"
+    "- напомни через 2 часа выйти на созвон\n\n"
+    "🔁 <b>Повторяющиеся</b>\n"
+    "- напомни каждый день в 10 выпить витамины\n"
+    "- напомни каждую неделю в 9 отправить отчёт\n"
+    "- напомни каждый месяц в 1 оплатить сервер\n\n"
+    "📋 <b>Команды</b>\n"
+    "/list - список активных напоминаний\n"
+    "/cancel ID - удалить напоминание\n"
+    "/timezone Europe/Moscow - установить часовой пояс\n"
+    "/mytimezone - показать текущий часовой пояс\n\n"
+    "💡 <b>Подсказка</b>\n"
+    "Чем естественнее формулировка - тем удобнее пользоваться ботом."
+)
+
+CREATE_REMINDER_HINT = (
+    "➕ <b>Создание напоминания</b>\n\n"
+    "Просто отправь сообщение в одном из форматов:\n\n"
+    "- напомни завтра в 9 созвон\n"
+    "- напомни через 30 минут проверить духовку\n"
+    "- напомни каждый день в 10 выпить витамины\n"
+    "- /remind 2026-03-31 18:30 Купить молоко"
+)
+
+TIMEZONE_HINT = (
+    "🌍 <b>Настройка часового пояса</b>\n\n"
+    "Выбери популярный вариант кнопкой ниже\n"
+    "или отправь свой вручную, например:\n"
+    "<code>/timezone Europe/Moscow</code>"
+)
+
+
+def _get_ids(message: Message) -> tuple[int, int]:
+    if message.from_user is None:
+        raise ValueError("Не удалось определить пользователя")
+    return message.from_user.id, message.chat.id
+
+
+@router.message(Command("start"))
+async def cmd_start(message: Message) -> None:
+    telegram_user_id, chat_id = _get_ids(message)
+    await get_or_create_user(telegram_user_id, chat_id)
+    timezone_name = await get_user_timezone(telegram_user_id, chat_id)
+
+    text = f"{START_TEXT}\n\n🕒 <b>Твой часовой пояс:</b> <code>{timezone_name}</code>"
+
+    await message.answer(
+        text,
+        reply_markup=get_main_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@router.message(Command("help"))
+async def cmd_help(message: Message) -> None:
+    await message.answer(
+        HELP_TEXT,
+        reply_markup=get_main_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@router.message(Command("mytimezone"))
+async def cmd_mytimezone(message: Message) -> None:
+    telegram_user_id, chat_id = _get_ids(message)
+    await get_or_create_user(telegram_user_id, chat_id)
+    timezone_name = await get_user_timezone(telegram_user_id, chat_id)
+
+    await message.answer(
+        f"🌍 Твой текущий часовой пояс: <code>{timezone_name}</code>",
+        reply_markup=get_main_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@router.message(Command("timezone"))
+async def cmd_timezone(message: Message, command: CommandObject) -> None:
+    telegram_user_id, chat_id = _get_ids(message)
+    await get_or_create_user(telegram_user_id, chat_id)
+
+    if not command.args:
+        await message.answer(
+            TIMEZONE_HINT,
+            reply_markup=get_timezone_keyboard(),
+            parse_mode="HTML",
+        )
+        return
+
+    timezone_name = command.args.strip()
+
+    try:
+        updated_user = await set_user_timezone(telegram_user_id, chat_id, timezone_name)
+        await message.answer(
+            f"✅ Часовой пояс обновлён: <code>{updated_user.timezone}</code>",
+            reply_markup=get_main_keyboard(),
+            parse_mode="HTML",
+        )
+    except ValueError as exc:
+        await message.answer(
+            f"❌ {exc}\n\nПопробуй, например: <code>/timezone Europe/Moscow</code>",
+            reply_markup=get_timezone_keyboard(),
+            parse_mode="HTML",
+        )
+
+
+@router.message(Command("list"))
+async def cmd_list(message: Message) -> None:
+    telegram_user_id, chat_id = _get_ids(message)
+    user = await get_or_create_user(telegram_user_id, chat_id)
+    reminders = await list_pending_reminders(user)
+
+    if not reminders:
+        await message.answer(
+            "📭 У тебя пока нет активных напоминаний.\n\n"
+            "Нажми «➕ Создать напоминание» или просто напиши его текстом.",
+            reply_markup=get_main_keyboard(),
+        )
+        return
+
+    timezone_name = await get_user_timezone(telegram_user_id, chat_id)
+    rendered = "\n\n".join(
+        f"{index}. {format_reminder_for_user(reminder, timezone_name)}"
+        for index, reminder in enumerate(reminders, start=1)
+    )
+
+    await message.answer(
+        f"📋 <b>Твои активные напоминания:</b>\n\n{rendered}",
+        reply_markup=get_main_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@router.message(F.text == "➕ Создать напоминание")
+async def btn_create_reminder(message: Message) -> None:
+    await message.answer(
+        CREATE_REMINDER_HINT,
+        reply_markup=get_main_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@router.message(F.text == "📋 Мои напоминания")
+async def btn_list(message: Message) -> None:
+    telegram_user_id, chat_id = _get_ids(message)
+    user = await get_or_create_user(telegram_user_id, chat_id)
+    reminders = await list_pending_reminders(user)
+
+    if not reminders:
+        await message.answer(
+            "📭 У тебя пока нет активных напоминаний.",
+            reply_markup=get_main_keyboard(),
+        )
+        return
+
+    timezone_name = await get_user_timezone(telegram_user_id, chat_id)
+    rendered = "\n\n".join(
+        f"{index}. {format_reminder_for_user(reminder, timezone_name)}"
+        for index, reminder in enumerate(reminders, start=1)
+    )
+
+    await message.answer(
+        f"📋 <b>Твои активные напоминания:</b>\n\n{rendered}",
+        reply_markup=get_main_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@router.message(F.text == "🌍 Часовой пояс")
+async def btn_timezone(message: Message) -> None:
+    telegram_user_id, chat_id = _get_ids(message)
+    await get_or_create_user(telegram_user_id, chat_id)
+    timezone_name = await get_user_timezone(telegram_user_id, chat_id)
+
+    await message.answer(
+        f"{TIMEZONE_HINT}\n\nСейчас установлен: <code>{timezone_name}</code>",
+        reply_markup=get_timezone_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@router.message(F.text == "❓ Помощь")
+async def btn_help(message: Message) -> None:
+    await message.answer(
+        HELP_TEXT,
+        reply_markup=get_main_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@router.message(F.text.in_({"Europe/Moscow", "Europe/Helsinki", "Europe/Berlin", "UTC"}))
+async def btn_set_popular_timezone(message: Message) -> None:
+    telegram_user_id, chat_id = _get_ids(message)
+    await get_or_create_user(telegram_user_id, chat_id)
+    timezone_name = (message.text or "").strip()
+
+    try:
+        updated_user = await set_user_timezone(telegram_user_id, chat_id, timezone_name)
+        await message.answer(
+            f"✅ Часовой пояс обновлён: <code>{updated_user.timezone}</code>",
+            reply_markup=get_main_keyboard(),
+            parse_mode="HTML",
+        )
+    except ValueError as exc:
+        await message.answer(
+            f"❌ {exc}",
+            reply_markup=get_timezone_keyboard(),
+        )
+
+
+@router.message(F.text == "⬅️ Назад")
+async def btn_back(message: Message) -> None:
+    telegram_user_id, chat_id = _get_ids(message)
+    await get_or_create_user(telegram_user_id, chat_id)
+    timezone_name = await get_user_timezone(telegram_user_id, chat_id)
+
+    text = f"{START_TEXT}\n\n🕒 <b>Твой часовой пояс:</b> <code>{timezone_name}</code>"
+
+    await message.answer(
+        text,
+        reply_markup=get_main_keyboard(),
+        parse_mode="HTML",
+    )

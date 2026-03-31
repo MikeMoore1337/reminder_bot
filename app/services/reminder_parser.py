@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Literal
 
+from app.db.models import RecurrenceType
+
 Recurrence = Literal["none", "daily", "weekly", "monthly"]
 
 REMIND_COMMAND_RE = re.compile(
@@ -109,3 +111,35 @@ def parse_reminder_input(raw_text: str, now_local: datetime) -> ParsedReminder |
         return ParsedReminder(local_dt=dt, text=reminder_text.strip(), recurrence_type="monthly")
 
     return None
+
+
+def parse_recurrence(text: str):
+    text = text.lower()
+
+    # каждые X минут
+    m = re.search(r"каждые\s+(\d+)\s+минут", text)
+    if m:
+        return RecurrenceType.MINUTES.value, int(m.group(1))
+
+    # каждый час
+    if "каждый час" in text:
+        return RecurrenceType.HOURLY.value, 1
+
+    # каждые X часов
+    m = re.search(r"каждые\s+(\d+)\s+час", text)
+    if m:
+        return RecurrenceType.HOURLY.value, int(m.group(1))
+
+    # день
+    if "каждый день" in text:
+        return RecurrenceType.DAILY.value, 1
+
+    # неделя
+    if "каждую неделю" in text:
+        return RecurrenceType.WEEKLY.value, 1
+
+    # месяц
+    if "каждый месяц" in text:
+        return RecurrenceType.MONTHLY.value, 1
+
+    return RecurrenceType.NONE.value, 1

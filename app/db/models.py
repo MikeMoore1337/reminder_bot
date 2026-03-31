@@ -11,6 +11,8 @@ from app.db.base import Base
 
 class RecurrenceType(StrEnum):
     NONE = "none"
+    MINUTES = "minutes"
+    HOURLY = "hourly"
     DAILY = "daily"
     WEEKLY = "weekly"
     MONTHLY = "monthly"

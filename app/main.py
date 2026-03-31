@@ -53,10 +53,12 @@ async def run_webhook() -> None:
         allowed_updates=settings.allowed_updates,
         drop_pending_updates=False,
     )
+
     app = build_web_app(bot, dp)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, host=settings.app_host, port=settings.app_port)
+
     try:
         await site.start()
         logger.info("Webhook server started")
