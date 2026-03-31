@@ -95,20 +95,6 @@ Telegram → Bot (aiogram) → PostgreSQL → Worker
 
 ---
 
-## 🗂 Структура проекта
-
-app/
- ├── handlers/
- ├── services/
- ├── db/
- ├── workers/
- ├── keyboards/
- ├── middlewares/
- ├── main.py
- └── bot_factory.py
-
----
-
 ## ⚙️ Установка
 
 ### 1. Клонирование
@@ -123,7 +109,7 @@ BOT_TOKEN=your_token
 BOT_MODE=polling  
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/reminder_bot  
 LOG_LEVEL=INFO  
-DEFAULT_TIMEZONE=Europe/Helsinki  
+DEFAULT_TIMEZONE=Europe/oscow  
 ADMIN_IDS=123456789  
 
 ---
@@ -189,7 +175,3 @@ docker compose up -d
 - предсказуемость  
 
 ---
-
-## 👨‍💻 Автор
-
-Python QA Automation Engineer
