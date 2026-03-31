@@ -29,7 +29,9 @@ async def run_polling() -> None:
 async def run_webhook() -> None:
     logger.info(
         "Starting bot application in webhook mode",
-        extra={"extra_data": f"url={settings.webhook_url} host={settings.app_host} port={settings.app_port}"},
+        extra={
+            "extra_data": f"url={settings.webhook_url} host={settings.app_host} port={settings.app_port}"
+        },
     )
     if not settings.webhook_url:
         raise RuntimeError("WEBHOOK_BASE_URL must be set in webhook mode")

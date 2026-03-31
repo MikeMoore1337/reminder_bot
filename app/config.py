@@ -1,6 +1,5 @@
 from functools import lru_cache
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -33,7 +32,6 @@ class Settings(BaseSettings):
     @property
     def allowed_updates(self) -> list[str]:
         return [item.strip() for item in self.polling_allowed_updates.split(",") if item.strip()]
-
 
     @property
     def admin_ids(self) -> set[int]:

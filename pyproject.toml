@@ -3,10 +3,10 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.backends.legacy:build"
 
 [project]
-name = "crypto-ema-bot"
+name = "reminder_bot"
 version = "0.1.0"
-description = "Algorithmic trading bot for Bybit based on EMA trend-following strategy"
-requires-python = ">=3.11"
+description = "Telegram bot for reminders"
+requires-python = ">=3.12"
 dependencies = [
     "pybit>=5.6.0",
     "pandas>=2.0.0",
@@ -30,7 +30,7 @@ dev = [
 # Ruff заменяет flake8 + isort + pyupgrade + десятки других линтеров.
 # Работает в 10–100× быстрее каждого из них по отдельности.
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
@@ -86,26 +86,18 @@ indent-style = "space"
 
 # ─── Mypy ────────────────────────────────────────────────────────────────────
 [tool.mypy]
-python_version = "3.13"
-strict = false           # strict=true слишком агрессивен для торгового бота с pandas
+python_version = "3.12"
+strict = false
+exclude = ["^alembic/"]
 
-# Включаем полезные проверки без лишнего шума
 warn_return_any = true
 warn_unused_ignores = true
 warn_redundant_casts = true
-disallow_untyped_defs = true     # все функции должны иметь аннотации
+disallow_untyped_defs = true
 disallow_incomplete_defs = true
 check_untyped_defs = true
 no_implicit_optional = true
 
-# Сторонние библиотеки без стабов
 [[tool.mypy.overrides]]
-module = ["pandas.*", "numpy.*", "pybit.*", "pandas_ta.*", "colorlog.*"]
-ignore_missing_imports = true
-
-# Файлы с зависимостями которых нет в изолированном pre-commit окружении.
-# Все они импортируют config/logger → dotenv/colorlog → не установлены.
-# Локальная проверка: mypy . --ignore-missing-imports
-[[tool.mypy.overrides]]
-module = ["bot", "backtest", "exchange", "optimize", "multi_backtest", "risk_manager", "strategy", "config", "logger"]
+module = ["alembic", "alembic.*"]
 ignore_errors = true

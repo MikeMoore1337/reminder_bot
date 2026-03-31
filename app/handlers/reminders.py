@@ -26,8 +26,12 @@ def reminder_actions_kb(reminder_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="Отложить на 10 минут", callback_data=f"reminder:snooze:{reminder_id}"),
-                InlineKeyboardButton(text="Удалить", callback_data=f"reminder:delete:{reminder_id}"),
+                InlineKeyboardButton(
+                    text="Отложить на 10 минут", callback_data=f"reminder:snooze:{reminder_id}"
+                ),
+                InlineKeyboardButton(
+                    text="Удалить", callback_data=f"reminder:delete:{reminder_id}"
+                ),
             ]
         ]
     )
@@ -61,7 +65,12 @@ async def _create_and_answer(message: Message) -> None:
 
     local_dt = from_utc_to_user(reminder.remind_at_utc, user.timezone)
     repetition = "нет" if parsed.recurrence_type == "none" else parsed.recurrence_type
-    labels = {"daily": "каждый день", "weekly": "каждую неделю", "monthly": "каждый месяц", "none": "нет"}
+    labels = {
+        "daily": "каждый день",
+        "weekly": "каждую неделю",
+        "monthly": "каждый месяц",
+        "none": "нет",
+    }
     await message.answer(
         "Напоминание сохранено.\n"
         f"ID: {reminder.id}\n"
@@ -74,7 +83,15 @@ async def _create_and_answer(message: Message) -> None:
 
 @router.message(Command("remind"))
 async def cmd_remind(message: Message) -> None:
-    if parse_reminder_input(message.text or "", now_local=now_in_timezone((await get_or_create_user(message.from_user.id, message.chat.id)).timezone)) is None:
+    if (
+        parse_reminder_input(
+            message.text or "",
+            now_local=now_in_timezone(
+                (await get_or_create_user(message.from_user.id, message.chat.id)).timezone
+            ),
+        )
+        is None
+    ):
         await message.answer(
             "Не понял формат. Используй, например:\n"
             "/remind 2026-03-31 18:30 Купить молоко\n"

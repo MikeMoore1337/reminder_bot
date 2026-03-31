@@ -21,8 +21,12 @@ def reminder_actions_kb(reminder_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="Отложить на 10 минут", callback_data=f"reminder:snooze:{reminder_id}"),
-                InlineKeyboardButton(text="Удалить", callback_data=f"reminder:delete:{reminder_id}"),
+                InlineKeyboardButton(
+                    text="Отложить на 10 минут", callback_data=f"reminder:snooze:{reminder_id}"
+                ),
+                InlineKeyboardButton(
+                    text="Удалить", callback_data=f"reminder:delete:{reminder_id}"
+                ),
             ]
         ]
     )
@@ -50,49 +54,47 @@ async def fetch_due_reminders(limit: int) -> list[Reminder]:
 
 
 async def mark_after_send(reminder_id: int) -> None:
-    async with SessionLocal() as session:
-        async with session.begin():
-            reminder = await session.get(Reminder, reminder_id)
-            if reminder is None:
-                return
-            reminder.sent_at = utc_now()
-            reminder.error_text = None
-            reminder.retry_count = 0
+    async with SessionLocal() as session, session.begin():
+        reminder = await session.get(Reminder, reminder_id)
+        if reminder is None:
+            return
+        reminder.sent_at = utc_now()
+        reminder.error_text = None
+        reminder.retry_count = 0
 
-            if reminder.recurrence_type == RecurrenceType.NONE.value:
-                reminder.status = "sent"
-                return
+        if reminder.recurrence_type == RecurrenceType.NONE.value:
+            reminder.status = "sent"
+            return
 
-            next_occurrence = calculate_next_occurrence(
-                reminder.remind_at_utc,
+        next_occurrence = calculate_next_occurrence(
+            reminder.remind_at_utc,
+            reminder.recurrence_type,
+            reminder.recurrence_interval,
+        )
+        if next_occurrence is None:
+            reminder.status = "sent"
+            return
+        while next_occurrence <= utc_now():
+            future_occurrence = calculate_next_occurrence(
+                next_occurrence,
                 reminder.recurrence_type,
                 reminder.recurrence_interval,
             )
-            if next_occurrence is None:
-                reminder.status = "sent"
-                return
-            while next_occurrence <= utc_now():
-                future_occurrence = calculate_next_occurrence(
-                    next_occurrence,
-                    reminder.recurrence_type,
-                    reminder.recurrence_interval,
-                )
-                if future_occurrence is None:
-                    break
-                next_occurrence = future_occurrence
-            reminder.remind_at_utc = next_occurrence
-            reminder.status = "pending"
+            if future_occurrence is None:
+                break
+            next_occurrence = future_occurrence
+        reminder.remind_at_utc = next_occurrence
+        reminder.status = "pending"
 
 
 async def mark_failed(reminder_id: int, error_text: str) -> None:
-    async with SessionLocal() as session:
-        async with session.begin():
-            reminder = await session.get(Reminder, reminder_id)
-            if reminder is None:
-                return
-            reminder.status = "pending" if reminder.retry_count < 3 else "failed"
-            reminder.retry_count += 1
-            reminder.error_text = error_text[:2000]
+    async with SessionLocal() as session, session.begin():
+        reminder = await session.get(Reminder, reminder_id)
+        if reminder is None:
+            return
+        reminder.status = "pending" if reminder.retry_count < 3 else "failed"
+        reminder.retry_count += 1
+        reminder.error_text = error_text[:2000]
 
 
 async def process_due_reminders(bot: Bot) -> int:

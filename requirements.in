@@ -16,5 +16,3 @@ ruff
 black
 mypy
 pre-commit
-
-

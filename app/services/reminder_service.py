@@ -3,6 +3,7 @@ from __future__ import annotations
 import calendar
 import logging
 from datetime import datetime, timedelta
+from typing import cast
 
 from sqlalchemy import func, select
 
@@ -20,7 +21,9 @@ def _next_month(dt: datetime) -> datetime:
     return dt.replace(year=year, month=month, day=day)
 
 
-def calculate_next_occurrence(remind_at_utc: datetime, recurrence_type: str, recurrence_interval: int) -> datetime | None:
+def calculate_next_occurrence(
+    remind_at_utc: datetime, recurrence_type: str, recurrence_interval: int
+) -> datetime | None:
     if recurrence_type == RecurrenceType.NONE.value:
         return None
     if recurrence_type == RecurrenceType.DAILY.value:
@@ -35,7 +38,13 @@ def calculate_next_occurrence(remind_at_utc: datetime, recurrence_type: str, rec
     raise ValueError(f"Unsupported recurrence_type: {recurrence_type}")
 
 
-async def create_reminder(user: User, local_dt: datetime, text: str, recurrence_type: str = "none", recurrence_interval: int = 1) -> Reminder:
+async def create_reminder(
+    user: User,
+    local_dt: datetime,
+    text: str,
+    recurrence_type: str = "none",
+    recurrence_interval: int = 1,
+) -> Reminder:
     remind_at_utc = to_utc(local_dt, user.timezone)
     now_utc = utc_now()
 
@@ -97,7 +106,9 @@ async def delete_reminder_any_status(user: User, reminder_id: int) -> bool:
             return False
         await session.delete(reminder)
         await session.commit()
-        logger.info("Deleted reminder", extra={"extra_data": f"reminder_id={reminder_id} user_id={user.id}"})
+        logger.info(
+            "Deleted reminder", extra={"extra_data": f"reminder_id={reminder_id} user_id={user.id}"}
+        )
         return True
 
 
@@ -124,15 +135,14 @@ async def snooze_reminder(user: User, reminder_id: int, minutes: int = 10) -> Re
         reminder.error_text = None
         await session.commit()
         await session.refresh(reminder)
-        return reminder
+        return cast(Reminder | None, reminder)
 
 
 async def set_last_message_id(reminder_id: int, message_id: int | None) -> None:
-    async with SessionLocal() as session:
-        async with session.begin():
-            reminder = await session.get(Reminder, reminder_id)
-            if reminder is not None:
-                reminder.last_message_id = message_id
+    async with SessionLocal() as session, session.begin():
+        reminder = await session.get(Reminder, reminder_id)
+        if reminder is not None:
+            reminder.last_message_id = message_id
 
 
 async def get_stats() -> dict[str, int]:
@@ -146,10 +156,14 @@ async def get_stats() -> dict[str, int]:
             select(func.count()).select_from(Reminder).where(Reminder.status == "failed")
         )
         recurring_reminders = await session.scalar(
-            select(func.count()).select_from(Reminder).where(Reminder.recurrence_type != RecurrenceType.NONE.value)
+            select(func.count())
+            .select_from(Reminder)
+            .where(Reminder.recurrence_type != RecurrenceType.NONE.value)
         )
         sent_today = await session.scalar(
-            select(func.count()).select_from(Reminder).where(
+            select(func.count())
+            .select_from(Reminder)
+            .where(
                 Reminder.sent_at.is_not(None),
                 Reminder.sent_at >= utc_now() - timedelta(days=1),
             )
@@ -176,16 +190,21 @@ async def get_failed_reminders(limit: int = 20) -> list[Reminder]:
 
 
 def format_recurrence(reminder: Reminder) -> str:
-    if reminder.recurrence_type == RecurrenceType.NONE.value:
+    recurrence_type = cast(str, reminder.recurrence_type)
+    recurrence_interval = cast(int, reminder.recurrence_interval)
+
+    if recurrence_type == RecurrenceType.NONE.value:
         return "нет"
-    labels = {
+
+    labels: dict[str, str] = {
         RecurrenceType.DAILY.value: "каждый день",
         RecurrenceType.WEEKLY.value: "каждую неделю",
         RecurrenceType.MONTHLY.value: "каждый месяц",
     }
-    label = labels.get(reminder.recurrence_type, reminder.recurrence_type)
-    if reminder.recurrence_interval > 1:
-        return f"{label} x{reminder.recurrence_interval}"
+
+    label = labels.get(recurrence_type, recurrence_type)
+    if recurrence_interval > 1:
+        return f"{label} x{recurrence_interval}"
     return label
 
 

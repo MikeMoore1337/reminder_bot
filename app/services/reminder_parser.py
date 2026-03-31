@@ -21,9 +21,15 @@ TODAY_RE = re.compile(r"^напомни\s+сегодня\s+в\s+(\d{1,2})(?::(\d
 TOMORROW_RE = re.compile(r"^напомни\s+завтра\s+в\s+(\d{1,2})(?::(\d{2}))?\s+(.+)$", re.IGNORECASE)
 IN_HOURS_RE = re.compile(r"^напомни\s+через\s+(\d+)\s+час(?:а|ов)?\s+(.+)$", re.IGNORECASE)
 IN_MINUTES_RE = re.compile(r"^напомни\s+через\s+(\d+)\s+мин(?:ут|уты|уту)?\s+(.+)$", re.IGNORECASE)
-EVERY_DAY_RE = re.compile(r"^напомни\s+каждый\s+день\s+в\s+(\d{1,2})(?::(\d{2}))?\s+(.+)$", re.IGNORECASE)
-EVERY_WEEK_RE = re.compile(r"^напомни\s+каждую\s+неделю\s+в\s+(\d{1,2})(?::(\d{2}))?\s+(.+)$", re.IGNORECASE)
-EVERY_MONTH_RE = re.compile(r"^напомни\s+каждый\s+месяц\s+в\s+(\d{1,2})(?::(\d{2}))?\s+(.+)$", re.IGNORECASE)
+EVERY_DAY_RE = re.compile(
+    r"^напомни\s+каждый\s+день\s+в\s+(\d{1,2})(?::(\d{2}))?\s+(.+)$", re.IGNORECASE
+)
+EVERY_WEEK_RE = re.compile(
+    r"^напомни\s+каждую\s+неделю\s+в\s+(\d{1,2})(?::(\d{2}))?\s+(.+)$", re.IGNORECASE
+)
+EVERY_MONTH_RE = re.compile(
+    r"^напомни\s+каждый\s+месяц\s+в\s+(\d{1,2})(?::(\d{2}))?\s+(.+)$", re.IGNORECASE
+)
 
 
 @dataclass(slots=True)
@@ -56,25 +62,33 @@ def parse_reminder_input(raw_text: str, now_local: datetime) -> ParsedReminder |
     m = TODAY_RE.match(text)
     if m:
         hour, minute, reminder_text = m.groups()
-        return ParsedReminder(local_dt=_build_time(now_local, hour, minute), text=reminder_text.strip())
+        return ParsedReminder(
+            local_dt=_build_time(now_local, hour, minute), text=reminder_text.strip()
+        )
 
     m = TOMORROW_RE.match(text)
     if m:
         hour, minute, reminder_text = m.groups()
         base_dt = now_local + timedelta(days=1)
-        return ParsedReminder(local_dt=_build_time(base_dt, hour, minute), text=reminder_text.strip())
+        return ParsedReminder(
+            local_dt=_build_time(base_dt, hour, minute), text=reminder_text.strip()
+        )
 
     m = IN_HOURS_RE.match(text)
     if m:
         hours, reminder_text = m.groups()
         dt = now_local + timedelta(hours=int(hours))
-        return ParsedReminder(local_dt=dt.replace(second=0, microsecond=0), text=reminder_text.strip())
+        return ParsedReminder(
+            local_dt=dt.replace(second=0, microsecond=0), text=reminder_text.strip()
+        )
 
     m = IN_MINUTES_RE.match(text)
     if m:
         minutes, reminder_text = m.groups()
         dt = now_local + timedelta(minutes=int(minutes))
-        return ParsedReminder(local_dt=dt.replace(second=0, microsecond=0), text=reminder_text.strip())
+        return ParsedReminder(
+            local_dt=dt.replace(second=0, microsecond=0), text=reminder_text.strip()
+        )
 
     m = EVERY_DAY_RE.match(text)
     if m:

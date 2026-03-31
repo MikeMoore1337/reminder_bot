@@ -43,10 +43,7 @@ async def cmd_help(message: Message) -> None:
 async def cmd_timezone(message: Message) -> None:
     parts = (message.text or "").split(maxsplit=1)
     if len(parts) != 2:
-        await message.answer(
-            "Укажи часовой пояс так:\n"
-            "/timezone Europe/Moscow"
-        )
+        await message.answer("Укажи часовой пояс так:\n/timezone Europe/Moscow")
         return
 
     timezone_name = parts[1].strip()
