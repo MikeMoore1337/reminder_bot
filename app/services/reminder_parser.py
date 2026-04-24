@@ -7,7 +7,7 @@ from typing import Literal
 
 from app.db.models import RecurrenceType
 
-Recurrence = Literal["none", "daily", "weekly", "monthly"]
+Recurrence = Literal["none", "minutes", "hourly", "daily", "weekly", "monthly"]
 
 REMIND_COMMAND_RE = re.compile(
     r"^/remind\s+(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})\s+(.+)$",
@@ -32,6 +32,13 @@ EVERY_WEEK_RE = re.compile(
 EVERY_MONTH_RE = re.compile(
     r"^напомни\s+каждый\s+месяц\s+в\s+(\d{1,2})(?::(\d{2}))?\s+(.+)$", re.IGNORECASE
 )
+EVERY_MINUTES_RE = re.compile(
+    r"^напомни\s+каждые\s+(\d+)\s+(?:минут(?:у|ы)?|мин)\s+(.+)$", re.IGNORECASE
+)
+EVERY_HOUR_RE = re.compile(r"^напомни\s+каждый\s+час\s+(.+)$", re.IGNORECASE)
+EVERY_HOURS_RE = re.compile(
+    r"^напомни\s+каждые\s+(\d+)\s+час(?:а|ов)?\s+(.+)$", re.IGNORECASE
+)
 
 
 @dataclass(slots=True)
@@ -42,8 +49,18 @@ class ParsedReminder:
     recurrence_interval: int = 1
 
 
-def _build_time(base_dt: datetime, hour: str, minute: str | None) -> datetime:
-    return base_dt.replace(hour=int(hour), minute=int(minute or 0), second=0, microsecond=0)
+def _parse_datetime(value: str, fmt: str) -> datetime | None:
+    try:
+        return datetime.strptime(value, fmt)
+    except ValueError:
+        return None
+
+
+def _build_time(base_dt: datetime, hour: str, minute: str | None) -> datetime | None:
+    try:
+        return base_dt.replace(hour=int(hour), minute=int(minute or 0), second=0, microsecond=0)
+    except ValueError:
+        return None
 
 
 def parse_reminder_input(raw_text: str, now_local: datetime) -> ParsedReminder | None:
@@ -52,29 +69,35 @@ def parse_reminder_input(raw_text: str, now_local: datetime) -> ParsedReminder |
     command_match = REMIND_COMMAND_RE.match(text)
     if command_match:
         date_part, time_part, reminder_text = command_match.groups()
-        local_dt = datetime.strptime(f"{date_part} {time_part}", "%Y-%m-%d %H:%M")
+        local_dt = _parse_datetime(f"{date_part} {time_part}", "%Y-%m-%d %H:%M")
+        if local_dt is None:
+            return None
         return ParsedReminder(local_dt=local_dt, text=reminder_text.strip())
 
     text_match = REMIND_TEXT_RE.match(text)
     if text_match:
         date_part, time_part, reminder_text = text_match.groups()
-        local_dt = datetime.strptime(f"{date_part} {time_part}", "%d.%m.%Y %H:%M")
+        local_dt = _parse_datetime(f"{date_part} {time_part}", "%d.%m.%Y %H:%M")
+        if local_dt is None:
+            return None
         return ParsedReminder(local_dt=local_dt, text=reminder_text.strip())
 
     m = TODAY_RE.match(text)
     if m:
         hour, minute, reminder_text = m.groups()
-        return ParsedReminder(
-            local_dt=_build_time(now_local, hour, minute), text=reminder_text.strip()
-        )
+        local_dt = _build_time(now_local, hour, minute)
+        if local_dt is None:
+            return None
+        return ParsedReminder(local_dt=local_dt, text=reminder_text.strip())
 
     m = TOMORROW_RE.match(text)
     if m:
         hour, minute, reminder_text = m.groups()
         base_dt = now_local + timedelta(days=1)
-        return ParsedReminder(
-            local_dt=_build_time(base_dt, hour, minute), text=reminder_text.strip()
-        )
+        local_dt = _build_time(base_dt, hour, minute)
+        if local_dt is None:
+            return None
+        return ParsedReminder(local_dt=local_dt, text=reminder_text.strip())
 
     m = IN_HOURS_RE.match(text)
     if m:
@@ -95,29 +118,69 @@ def parse_reminder_input(raw_text: str, now_local: datetime) -> ParsedReminder |
     m = EVERY_DAY_RE.match(text)
     if m:
         hour, minute, reminder_text = m.groups()
-        dt = _build_time(now_local, hour, minute)
-        return ParsedReminder(local_dt=dt, text=reminder_text.strip(), recurrence_type="daily")
+        local_dt = _build_time(now_local, hour, minute)
+        if local_dt is None:
+            return None
+        return ParsedReminder(local_dt=local_dt, text=reminder_text.strip(), recurrence_type="daily")
 
     m = EVERY_WEEK_RE.match(text)
     if m:
         hour, minute, reminder_text = m.groups()
-        dt = _build_time(now_local, hour, minute)
-        return ParsedReminder(local_dt=dt, text=reminder_text.strip(), recurrence_type="weekly")
+        local_dt = _build_time(now_local, hour, minute)
+        if local_dt is None:
+            return None
+        return ParsedReminder(local_dt=local_dt, text=reminder_text.strip(), recurrence_type="weekly")
 
     m = EVERY_MONTH_RE.match(text)
     if m:
         hour, minute, reminder_text = m.groups()
-        dt = _build_time(now_local, hour, minute)
-        return ParsedReminder(local_dt=dt, text=reminder_text.strip(), recurrence_type="monthly")
+        local_dt = _build_time(now_local, hour, minute)
+        if local_dt is None:
+            return None
+        return ParsedReminder(local_dt=local_dt, text=reminder_text.strip(), recurrence_type="monthly")
+
+    m = EVERY_MINUTES_RE.match(text)
+    if m:
+        minutes, reminder_text = m.groups()
+        interval = int(minutes)
+        dt = now_local + timedelta(minutes=interval)
+        return ParsedReminder(
+            local_dt=dt.replace(second=0, microsecond=0),
+            text=reminder_text.strip(),
+            recurrence_type="minutes",
+            recurrence_interval=interval,
+        )
+
+    m = EVERY_HOUR_RE.match(text)
+    if m:
+        (reminder_text,) = m.groups()
+        dt = now_local + timedelta(hours=1)
+        return ParsedReminder(
+            local_dt=dt.replace(second=0, microsecond=0),
+            text=reminder_text.strip(),
+            recurrence_type="hourly",
+        )
+
+    m = EVERY_HOURS_RE.match(text)
+    if m:
+        hours, reminder_text = m.groups()
+        interval = int(hours)
+        dt = now_local + timedelta(hours=interval)
+        return ParsedReminder(
+            local_dt=dt.replace(second=0, microsecond=0),
+            text=reminder_text.strip(),
+            recurrence_type="hourly",
+            recurrence_interval=interval,
+        )
 
     return None
 
 
-def parse_recurrence(text: str):
+def parse_recurrence(text: str) -> tuple[str, int]:
     text = text.lower()
 
     # каждые X минут
-    m = re.search(r"каждые\s+(\d+)\s+минут", text)
+    m = re.search(r"каждые\s+(\d+)\s+(?:минут(?:у|ы)?|мин)", text)
     if m:
         return RecurrenceType.MINUTES.value, int(m.group(1))
 

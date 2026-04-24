@@ -26,7 +26,7 @@ class User(Base):
         BigInteger, unique=True, index=True, nullable=False
     )
     chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Europe/Helsinki")
+    timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Europe/Moscow")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -1,54 +1,54 @@
 from __future__ import annotations
 
+from html import escape
+
 from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, Message
 
-from app.config import get_settings
 from app.services.reminder_parser import parse_reminder_input
 from app.services.reminder_service import (
     cancel_reminder,
     create_reminder,
-    format_reminder_for_user,
-    get_failed_reminders,
-    get_stats,
-    list_pending_reminders,
+    format_recurrence,
     snooze_reminder,
 )
 from app.services.timezone_service import get_or_create_user
 from app.utils.datetime_utils import from_utc_to_user, now_in_timezone
 
 router = Router()
-settings = get_settings()
+
+REMINDER_FORMAT_HINT = (
+    "Не понял формат. Используй, например:\n"
+    "/remind 2026-03-31 18:30 Купить молоко\n"
+    "напомни завтра в 9 созвон\n"
+    "напомни через 2 часа выключить духовку\n"
+    "напомни каждые 10 минут проверить сервер\n"
+    "напомни каждый день в 9 выпить витамины"
+)
 
 
-def reminder_actions_kb(reminder_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="Отложить на 10 минут", callback_data=f"reminder:snooze:{reminder_id}"
-                ),
-                InlineKeyboardButton(
-                    text="Удалить", callback_data=f"reminder:delete:{reminder_id}"
-                ),
-            ]
-        ]
-    )
+def _message_ids(message: Message) -> tuple[int, int] | None:
+    if message.from_user is None:
+        return None
+    return message.from_user.id, message.chat.id
 
 
-def is_admin(telegram_user_id: int) -> bool:
-    return telegram_user_id in settings.admin_ids
+async def _create_and_answer(message: Message, *, show_hint: bool = False) -> None:
+    ids = _message_ids(message)
+    if ids is None:
+        await message.answer("Не удалось определить пользователя")
+        return
 
+    telegram_user_id, chat_id = ids
+    user = await get_or_create_user(telegram_user_id=telegram_user_id, chat_id=chat_id)
 
-async def _create_and_answer(message: Message) -> None:
-    user = await get_or_create_user(
-        telegram_user_id=message.from_user.id,
-        chat_id=message.chat.id,
-    )
+    raw_text = message.text or ""
     now_local = now_in_timezone(user.timezone)
-    parsed = parse_reminder_input(message.text or "", now_local=now_local)
+    parsed = parse_reminder_input(raw_text, now_local=now_local)
     if parsed is None:
+        if show_hint or raw_text.strip().lower().startswith("напомни"):
+            await message.answer(REMINDER_FORMAT_HINT)
         return
 
     try:
@@ -64,60 +64,19 @@ async def _create_and_answer(message: Message) -> None:
         return
 
     local_dt = from_utc_to_user(reminder.remind_at_utc, user.timezone)
-    repetition = "нет" if parsed.recurrence_type == "none" else parsed.recurrence_type
-    labels = {
-        "daily": "каждый день",
-        "weekly": "каждую неделю",
-        "monthly": "каждый месяц",
-        "none": "нет",
-    }
     await message.answer(
         "Напоминание сохранено.\n"
         f"ID: {reminder.id}\n"
         f"Когда: {local_dt.strftime('%d.%m.%Y %H:%M')}\n"
-        f"Повтор: {labels.get(repetition, repetition)}\n"
-        f"Текст: {reminder.text}\n"
+        f"Повтор: {format_recurrence(reminder)}\n"
+        f"Текст: {escape(reminder.text)}\n"
         f"Часовой пояс: {user.timezone}"
     )
 
 
 @router.message(Command("remind"))
 async def cmd_remind(message: Message) -> None:
-    if (
-        parse_reminder_input(
-            message.text or "",
-            now_local=now_in_timezone(
-                (await get_or_create_user(message.from_user.id, message.chat.id)).timezone
-            ),
-        )
-        is None
-    ):
-        await message.answer(
-            "Не понял формат. Используй, например:\n"
-            "/remind 2026-03-31 18:30 Купить молоко\n"
-            "напомни завтра в 9 созвон\n"
-            "напомни через 2 часа выключить духовку\n"
-            "напомни каждый день в 9 выпить витамины"
-        )
-        return
-    await _create_and_answer(message)
-
-
-@router.message(Command("list"))
-async def cmd_list(message: Message) -> None:
-    user = await get_or_create_user(
-        telegram_user_id=message.from_user.id,
-        chat_id=message.chat.id,
-    )
-    reminders = await list_pending_reminders(user)
-    if not reminders:
-        await message.answer("Активных напоминаний нет")
-        return
-
-    text = "\n\n".join(format_reminder_for_user(item, user.timezone) for item in reminders[:20])
-    if len(reminders) > 20:
-        text += f"\n\nПоказаны первые 20 из {len(reminders)}"
-    await message.answer(text)
+    await _create_and_answer(message, show_hint=True)
 
 
 @router.message(Command("cancel"))
@@ -127,11 +86,14 @@ async def cmd_cancel(message: Message) -> None:
         await message.answer("Используй так: /cancel 12")
         return
 
+    ids = _message_ids(message)
+    if ids is None:
+        await message.answer("Не удалось определить пользователя")
+        return
+
     reminder_id = int(parts[1])
-    user = await get_or_create_user(
-        telegram_user_id=message.from_user.id,
-        chat_id=message.chat.id,
-    )
+    telegram_user_id, chat_id = ids
+    user = await get_or_create_user(telegram_user_id=telegram_user_id, chat_id=chat_id)
     deleted = await cancel_reminder(user=user, reminder_id=reminder_id)
     if deleted:
         await message.answer(f"Напоминание {reminder_id} удалено")
@@ -141,22 +103,32 @@ async def cmd_cancel(message: Message) -> None:
 
 @router.callback_query(F.data.startswith("reminder:"))
 async def reminder_callback(callback: CallbackQuery) -> None:
-    _, action, reminder_id_raw = callback.data.split(":", maxsplit=2)
+    data = callback.data or ""
+    parts = data.split(":", maxsplit=2)
+    if len(parts) != 3:
+        await callback.answer("Некорректная команда", show_alert=True)
+        return
+
+    _, action, reminder_id_raw = parts
     if not reminder_id_raw.isdigit():
         await callback.answer("Некорректный id", show_alert=True)
         return
 
+    if not isinstance(callback.message, Message):
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
+
     reminder_id = int(reminder_id_raw)
+    callback_message = callback.message
     user = await get_or_create_user(
         telegram_user_id=callback.from_user.id,
-        chat_id=callback.message.chat.id,
+        chat_id=callback_message.chat.id,
     )
 
     if action == "delete":
         deleted = await cancel_reminder(user=user, reminder_id=reminder_id)
         await callback.answer("Удалено" if deleted else "Уже удалено", show_alert=False)
-        if callback.message:
-            await callback.message.edit_reply_markup(reply_markup=None)
+        await callback_message.edit_reply_markup(reply_markup=None)
         return
 
     if action == "snooze":
@@ -164,50 +136,16 @@ async def reminder_callback(callback: CallbackQuery) -> None:
         if reminder is None:
             await callback.answer("Напоминание не найдено", show_alert=True)
             return
+
         local_dt = from_utc_to_user(reminder.remind_at_utc, user.timezone)
         await callback.answer("Отложено на 10 минут", show_alert=False)
-        if callback.message:
-            await callback.message.edit_reply_markup(reply_markup=None)
-            await callback.message.answer(
-                f"Напоминание {reminder.id} отложено до {local_dt.strftime('%d.%m.%Y %H:%M')}"
-            )
+        await callback_message.edit_reply_markup(reply_markup=None)
+        await callback_message.answer(
+            f"Напоминание {reminder.id} отложено до {local_dt.strftime('%d.%m.%Y %H:%M')}"
+        )
         return
 
     await callback.answer("Неизвестное действие", show_alert=True)
-
-
-@router.message(Command("stats"))
-async def cmd_stats(message: Message) -> None:
-    if not is_admin(message.from_user.id):
-        await message.answer("Команда доступна только администратору")
-        return
-    stats = await get_stats()
-    await message.answer(
-        "Статистика:\n"
-        f"Пользователи: {stats['total_users']}\n"
-        f"Всего напоминаний: {stats['total_reminders']}\n"
-        f"Активные: {stats['pending_reminders']}\n"
-        f"Повторяющиеся: {stats['recurring_reminders']}\n"
-        f"Ошибки: {stats['failed_reminders']}\n"
-        f"Отправлено за 24 часа: {stats['sent_last_24h']}"
-    )
-
-
-@router.message(Command("failed"))
-async def cmd_failed(message: Message) -> None:
-    if not is_admin(message.from_user.id):
-        await message.answer("Команда доступна только администратору")
-        return
-    reminders = await get_failed_reminders(limit=20)
-    if not reminders:
-        await message.answer("Неудачных отправок нет")
-        return
-    chunks = []
-    for item in reminders:
-        chunks.append(
-            f"ID: {item.id}\nchat_id: {item.chat_id}\nretry_count: {item.retry_count}\nошибка: {(item.error_text or '-')[:300]}"
-        )
-    await message.answer("\n\n".join(chunks))
 
 
 @router.message()

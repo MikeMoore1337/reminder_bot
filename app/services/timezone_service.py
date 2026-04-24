@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import cast
 
 from sqlalchemy import select
 
@@ -36,13 +35,13 @@ async def get_or_create_user(telegram_user_id: int, chat_id: int) -> User:
                     "extra_data": f"telegram_user_id={telegram_user_id} timezone={user.timezone}"
                 },
             )
-            return cast(User, user)
+            return user
 
         if user.chat_id != chat_id:
             user.chat_id = chat_id
             await session.commit()
 
-        return cast(User, user)
+        return user
 
 
 async def set_user_timezone(telegram_user_id: int, chat_id: int, timezone_name: str) -> User:
@@ -71,9 +70,9 @@ async def set_user_timezone(telegram_user_id: int, chat_id: int, timezone_name: 
             "Updated timezone",
             extra={"extra_data": f"telegram_user_id={telegram_user_id} timezone={timezone_name}"},
         )
-        return cast(User, user)
+        return user
 
 
 async def get_user_timezone(telegram_user_id: int, chat_id: int) -> str:
     user = await get_or_create_user(telegram_user_id=telegram_user_id, chat_id=chat_id)
-    return cast(str, user.timezone)
+    return user.timezone

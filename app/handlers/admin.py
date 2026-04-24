@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from html import escape
+
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -51,13 +53,15 @@ async def cmd_failed(message: Message) -> None:
     parts: list[str] = ["❌ <b>Последние failed-напоминания</b>\n"]
 
     for reminder in reminders:
+        reminder_text = escape(reminder.text[:300])
+        error_text = escape((reminder.error_text or "-")[:500])
         parts.append(
             f"ID: <b>{reminder.id}</b>\n"
             f"user_id: <code>{reminder.user_id}</code>\n"
             f"chat_id: <code>{reminder.chat_id}</code>\n"
             f"when_utc: <code>{reminder.remind_at_utc.strftime('%Y-%m-%d %H:%M:%S')}</code>\n"
-            f"text: {reminder.text}\n"
-            f"error: <code>{reminder.error_text or '-'}</code>\n"
+            f"text: {reminder_text}\n"
+            f"error: <code>{error_text}</code>\n"
         )
 
     await message.answer("\n".join(parts), parse_mode="HTML")

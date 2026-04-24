@@ -106,10 +106,14 @@ cd reminder_bot
 ### 2. Настройка .env
 
 BOT_TOKEN=your_token  
+POSTGRES_DB=reminder_bot  
+POSTGRES_USER=postgres  
+POSTGRES_PASSWORD=postgres  
 BOT_MODE=polling  
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/reminder_bot  
 LOG_LEVEL=INFO  
-DEFAULT_TIMEZONE=Europe/oscow  
+DEFAULT_TIMEZONE=Europe/Moscow  
+POLLING_ALLOWED_UPDATES=message,edited_message,callback_query  
 ADMIN_IDS=123456789  
 
 ---

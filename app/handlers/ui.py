@@ -4,6 +4,7 @@ from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 
+from app.db.models import Reminder
 from app.keyboards.reply import get_main_keyboard, get_timezone_keyboard
 from app.services.reminder_service import format_reminder_for_user, list_pending_reminders
 from app.services.timezone_service import (
@@ -70,6 +71,16 @@ def _get_ids(message: Message) -> tuple[int, int]:
     if message.from_user is None:
         raise ValueError("Не удалось определить пользователя")
     return message.from_user.id, message.chat.id
+
+
+def _render_reminders(reminders: list[Reminder], timezone_name: str) -> str:
+    rendered = "\n\n".join(
+        f"{index}. {format_reminder_for_user(reminder, timezone_name)}"
+        for index, reminder in enumerate(reminders[:20], start=1)
+    )
+    if len(reminders) > 20:
+        rendered += f"\n\nПоказаны первые 20 из {len(reminders)}"
+    return rendered
 
 
 @router.message(Command("start"))
@@ -154,10 +165,7 @@ async def cmd_list(message: Message) -> None:
         return
 
     timezone_name = await get_user_timezone(telegram_user_id, chat_id)
-    rendered = "\n\n".join(
-        f"{index}. {format_reminder_for_user(reminder, timezone_name)}"
-        for index, reminder in enumerate(reminders, start=1)
-    )
+    rendered = _render_reminders(reminders, timezone_name)
 
     await message.answer(
         f"📋 <b>Твои активные напоминания:</b>\n\n{rendered}",
@@ -189,10 +197,7 @@ async def btn_list(message: Message) -> None:
         return
 
     timezone_name = await get_user_timezone(telegram_user_id, chat_id)
-    rendered = "\n\n".join(
-        f"{index}. {format_reminder_for_user(reminder, timezone_name)}"
-        for index, reminder in enumerate(reminders, start=1)
-    )
+    rendered = _render_reminders(reminders, timezone_name)
 
     await message.answer(
         f"📋 <b>Твои активные напоминания:</b>\n\n{rendered}",

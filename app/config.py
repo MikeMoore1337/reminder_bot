@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,10 +8,10 @@ class Settings(BaseSettings):
     bot_token: str
     database_url: str
     log_level: str = "INFO"
-    default_timezone: str = "Europe/Helsinki"
+    default_timezone: str = "Europe/Moscow"
 
     bot_mode: str = "polling"
-    polling_allowed_updates: str = "message,edited_message"
+    polling_allowed_updates: str = "message,edited_message,callback_query"
 
     app_host: str = "0.0.0.0"
     app_port: int = 8080
@@ -20,7 +21,10 @@ class Settings(BaseSettings):
 
     worker_batch_size: int = 100
     worker_poll_interval_seconds: int = 2
-    admin_ids_raw: str = ""
+    admin_ids_raw: str = Field(
+        default="",
+        validation_alias=AliasChoices("ADMIN_IDS", "ADMIN_IDS_RAW"),
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -61,4 +65,4 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    return Settings()
+    return Settings()  # type: ignore[call-arg]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import calendar
 import logging
 from datetime import datetime, timedelta
+from html import escape
 from typing import cast
 
 from sqlalchemy import func, select
@@ -270,5 +271,5 @@ def format_reminder_for_user(reminder: Reminder, timezone_name: str) -> str:
         f"ID: {reminder.id}\n"
         f"Когда: {local_dt.strftime('%d.%m.%Y %H:%M')}\n"
         f"Повтор: {format_recurrence(reminder)}\n"
-        f"Текст: {reminder.text}"
+        f"Текст: {escape(reminder.text)}"
     )

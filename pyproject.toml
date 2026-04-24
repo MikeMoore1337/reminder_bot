@@ -8,21 +8,23 @@ version = "0.1.0"
 description = "Telegram bot for reminders"
 requires-python = ">=3.12"
 dependencies = [
-    "pybit>=5.6.0",
-    "pandas>=2.0.0",
-    "numpy>=1.24.0",
-    "pandas-ta>=0.3.14b",
+    "aiogram>=3.26.0",
+    "SQLAlchemy>=2.0.0",
+    "asyncpg>=0.30.0",
+    "pydantic-settings>=2.0.0",
     "python-dotenv>=1.0.0",
-    "requests>=2.31.0",
+    "tzdata>=2025.2",
+    "aiohttp>=3.12.0",
+    "alembic>=1.16.0",
+    "psycopg2-binary>=2.9.10",
     "colorlog>=6.7.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "ruff>=0.4.0",
-    "mypy>=1.10.0",
-    "pandas-stubs>=2.0.0",
-    "types-requests>=2.31.0",
+    "ruff>=0.15.0",
+    "mypy>=1.19.0",
+    "black>=26.0.0",
     "pre-commit>=3.0.0",
 ]
 
@@ -56,27 +58,11 @@ ignore = [
     "RUF002",
     "RUF003",
 
-    # E402 — импорты не в начале файла.
-    # В optimize.py os.environ["BOT_DISABLE_FILE_LOGGING"] = "1" должен
-    # выполниться ДО импорта модулей проекта — это намеренно.
-    "E402",
-
-    # SIM105 — contextlib.suppress вместо try/except/pass.
-    # В watchdog намеренно подавляем все ошибки Telegram — suppress здесь
-    # менее читаем чем явный except.
-    "SIM105",
 ]
-
-[tool.ruff.lint.per-file-ignores]
-# config.py: RUF012 — mutable ClassVar. Config — намеренно изменяемый
-# синглтон (оптимизатор меняет поля напрямую), ClassVar здесь не подходит.
-"config.py" = ["RUF012"]
 
 [tool.ruff.lint.isort]
 known-first-party = [
-    "bot", "strategy", "backtest", "config", "exchange",
-    "risk_manager", "logger", "telegram_notifier",
-    "multi_backtest", "optimize", "config_validation",
+    "app",
 ]
 
 [tool.ruff.format]

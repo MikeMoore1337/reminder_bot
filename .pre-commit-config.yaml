@@ -24,21 +24,16 @@ repos:
 
   # Ruff — линтер + форматтер
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.7
+    rev: v0.15.8
     hooks:
       - id: ruff
         args: ["--fix"]
       - id: ruff-format
 
   # Mypy — проверка типов.
-  # Модули с pybit (bot, backtest, exchange...) исключены через pyproject.toml
-  # [tool.mypy.overrides] ignore_errors = true — они требуют pybit в runtime.
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.0
+    rev: v1.19.1
     hooks:
       - id: mypy
         exclude: ^alembic/
-        additional_dependencies:
-          - pandas-stubs>=2.0.0
-          - types-requests>=2.31.0
         args: ["--ignore-missing-imports"]

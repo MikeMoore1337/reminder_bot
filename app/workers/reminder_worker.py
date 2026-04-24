@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from html import escape
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -92,8 +93,8 @@ async def mark_failed(reminder_id: int, error_text: str) -> None:
         reminder = await session.get(Reminder, reminder_id)
         if reminder is None:
             return
-        reminder.status = "pending" if reminder.retry_count < 3 else "failed"
         reminder.retry_count += 1
+        reminder.status = "pending" if reminder.retry_count < 3 else "failed"
         reminder.error_text = error_text[:2000]
 
 
@@ -107,7 +108,7 @@ async def process_due_reminders(bot: Bot) -> int:
         try:
             sent = await bot.send_message(
                 chat_id=reminder.chat_id,
-                text=f"⏰ Напоминание\n\n{reminder.text}",
+                text=f"⏰ Напоминание\n\n{escape(reminder.text)}",
                 reply_markup=reminder_actions_kb(reminder.id),
             )
             await set_last_message_id(reminder.id, sent.message_id)
